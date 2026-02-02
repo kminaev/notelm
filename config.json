@@ -1,0 +1,9 @@
+{
+  "output_directory": "./backups",
+  "backup_artifact_types": {
+    "reports": true,
+    "data_tables": true,
+    "audio": true,
+    "video": true
+  }
+}
