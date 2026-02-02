@@ -8,6 +8,7 @@ and artifacts to local Markdown files and other formats.
 Usage:
     python main.py                    # Use config.json output directory
     python main.py ./custom_backup    # Override output directory
+    python main.py --delete           # Backup and delete notebooks from cloud
 """
 
 import argparse
@@ -31,6 +32,7 @@ async def backup_notebooks(
     client: NotebookLMClient,
     output_dir: Path,
     artifact_types: dict[str, bool],
+    delete_from_cloud: bool = False,
 ) -> dict[str, int]:
     """Backup all notebooks and their contents.
     
@@ -38,6 +40,7 @@ async def backup_notebooks(
         client: The NotebookLM client.
         output_dir: The base output directory.
         artifact_types: Dictionary of which artifact types to backup.
+        delete_from_cloud: If True, delete notebooks from cloud after backup.
     
     Returns:
         Dictionary with backup statistics.
@@ -49,6 +52,8 @@ async def backup_notebooks(
         "data_tables": 0,
         "audio": 0,
         "video": 0,
+        "slides": 0,
+        "fulltext": 0,
     }
     
     # Fetch all notebooks
@@ -106,78 +111,147 @@ async def backup_notebooks(
         
         # Backup reports
         if artifact_types.get("reports", True):
-            reports_folder = ensure_directory(notebook_folder / "reports")
             reports = await client.artifacts.list_reports(notebook.id)
-            print_progress(f"  Found {len(reports)} reports")
-            
-            for report in reports:
-                stats["reports"] += 1
-                report_filename = sanitize_filename(report.title) + ".md"
-                report_path = reports_folder / report_filename
-                try:
-                    await client.artifacts.download_report(
-                        notebook.id, str(report_path), report.id
-                    )
-                    print_progress(f"    Downloaded report: {report.title}")
-                except Exception as e:
-                    print_error(f"    Failed to download report: {report.title} - {e}")
+            if reports:
+                reports_folder = ensure_directory(notebook_folder / "reports")
+                print_progress(f"  Found {len(reports)} reports")
+                
+                for report in reports:
+                    stats["reports"] += 1
+                    report_filename = sanitize_filename(report.title) + ".md"
+                    report_path = reports_folder / report_filename
+                    try:
+                        await client.artifacts.download_report(
+                            notebook.id, str(report_path), report.id
+                        )
+                        print_progress(f"    Downloaded report: {report.title}")
+                    except Exception as e:
+                        print_error(f"    Failed to download report: {report.title} - {e}")
+            else:
+                print_progress(f"  Found 0 reports")
         
         # Backup data tables
         if artifact_types.get("data_tables", True):
-            data_tables_folder = ensure_directory(notebook_folder / "data_tables")
             data_tables = await client.artifacts.list_data_tables(notebook.id)
-            print_progress(f"  Found {len(data_tables)} data tables")
-            
-            for dt in data_tables:
-                stats["data_tables"] += 1
-                dt_filename = sanitize_filename(dt.title) + ".csv"
-                dt_path = data_tables_folder / dt_filename
-                try:
-                    await client.artifacts.download_data_table(
-                        notebook.id, str(dt_path), dt.id
-                    )
-                    print_progress(f"    Downloaded data table: {dt.title}")
-                except Exception as e:
-                    print_error(
-                        f"    Failed to download data table: {dt.title} - {e}"
-                    )
+            if data_tables:
+                data_tables_folder = ensure_directory(notebook_folder / "data_tables")
+                print_progress(f"  Found {len(data_tables)} data tables")
+                
+                for dt in data_tables:
+                    stats["data_tables"] += 1
+                    dt_filename = sanitize_filename(dt.title) + ".csv"
+                    dt_path = data_tables_folder / dt_filename
+                    try:
+                        await client.artifacts.download_data_table(
+                            notebook.id, str(dt_path), dt.id
+                        )
+                        print_progress(f"    Downloaded data table: {dt.title}")
+                    except Exception as e:
+                        print_error(
+                            f"    Failed to download data table: {dt.title} - {e}"
+                        )
+            else:
+                print_progress(f"  Found 0 data tables")
         
         # Backup audio
         if artifact_types.get("audio", True):
-            audio_folder = ensure_directory(notebook_folder / "audio")
             audio_files = await client.artifacts.list_audio(notebook.id)
-            print_progress(f"  Found {len(audio_files)} audio files")
-            
-            for audio in audio_files:
-                stats["audio"] += 1
-                audio_filename = sanitize_filename(audio.title)
-                # Determine extension from URL or default to mp4
-                audio_path = audio_folder / f"{audio_filename}.mp4"
-                try:
-                    await client.artifacts.download_audio(
-                        notebook.id, str(audio_path), audio.id
-                    )
-                    print_progress(f"    Downloaded audio: {audio.title}")
-                except Exception as e:
-                    print_error(f"    Failed to download audio: {audio.title} - {e}")
+            if audio_files:
+                audio_folder = ensure_directory(notebook_folder / "audio")
+                print_progress(f"  Found {len(audio_files)} audio files")
+                
+                for audio in audio_files:
+                    stats["audio"] += 1
+                    audio_filename = sanitize_filename(audio.title)
+                    audio_path = audio_folder / f"{audio_filename}.mp4"
+                    try:
+                        await client.artifacts.download_audio(
+                            notebook.id, str(audio_path), audio.id
+                        )
+                        print_progress(f"    Downloaded audio: {audio.title}")
+                    except Exception as e:
+                        print_error(f"    Failed to download audio: {audio.title} - {e}")
+            else:
+                print_progress(f"  Found 0 audio files")
         
         # Backup video
         if artifact_types.get("video", True):
-            video_folder = ensure_directory(notebook_folder / "video")
             video_files = await client.artifacts.list_video(notebook.id)
-            print_progress(f"  Found {len(video_files)} video files")
+            if video_files:
+                video_folder = ensure_directory(notebook_folder / "video")
+                print_progress(f"  Found {len(video_files)} video files")
+                
+                for video in video_files:
+                    stats["video"] += 1
+                    video_filename = sanitize_filename(video.title)
+                    video_path = video_folder / f"{video_filename}.mp4"
+                    try:
+                        await client.artifacts.download_video(
+                            notebook.id, str(video_path), video.id
+                        )
+                        print_progress(f"    Downloaded video: {video.title}")
+                    except Exception as e:
+                        print_error(f"    Failed to download video: {video.title} - {e}")
+            else:
+                print_progress(f"  Found 0 video files")
+        
+        # Backup slide decks
+        if artifact_types.get("slides", True):
+            slide_decks = await client.artifacts.list_slide_decks(notebook.id)
+            if slide_decks:
+                slides_folder = ensure_directory(notebook_folder / "slides")
+                print_progress(f"  Found {len(slide_decks)} slide decks")
+                
+                for slide in slide_decks:
+                    stats["slides"] += 1
+                    slides_filename = sanitize_filename(slide.title) + ".pdf"
+                    slides_path = slides_folder / slides_filename
+                    try:
+                        await client.artifacts.download_slide_deck(
+                            notebook.id, str(slides_path), slide.id
+                        )
+                        print_progress(f"    Downloaded slide deck: {slide.title}")
+                    except Exception as e:
+                        print_error(f"    Failed to download slide deck: {slide.title} - {e}")
+            else:
+                print_progress(f"  Found 0 slide decks")
+        
+        # Backup fulltext for each source
+        sources = await client.sources.list(notebook.id)
+        if sources:
+            fulltext_folder = ensure_directory(notebook_folder / "fulltext")
+            print_progress(f"  Found {len(sources)} sources")
             
-            for video in video_files:
-                stats["video"] += 1
-                video_filename = sanitize_filename(video.title)
-                video_path = video_folder / f"{video_filename}.mp4"
+            for source in sources:
                 try:
-                    await client.artifacts.download_video(
-                        notebook.id, str(video_path), video.id
+                    fulltext = await client.sources.get_fulltext(
+                        notebook.id, source.id
                     )
-                    print_progress(f"    Downloaded video: {video.title}")
+                    stats["fulltext"] += 1
+                    # Use source title for filename, fallback to source id
+                    if source.title:
+                        source_filename = sanitize_filename(source.title) + ".txt"
+                    else:
+                        source_filename = f"{source.id}.txt"
+                    fulltext_path = fulltext_folder / source_filename
+                    
+                    with open(fulltext_path, "w", encoding="utf-8") as f:
+                        f.write(fulltext.content)
+                    print_progress(f"    Downloaded fulltext: {source.title or source.id}")
                 except Exception as e:
-                    print_error(f"    Failed to download video: {video.title} - {e}")
+                    print_error(
+                        f"    Failed to download fulltext: {source.title or source.id} - {e}"
+                    )
+        else:
+            print_progress(f"  Found 0 sources")
+        
+        # Delete from cloud if requested
+        if delete_from_cloud:
+            try:
+                await client.notebooks.delete(notebook.id)
+                print_progress(f"  Deleted notebook from cloud: {notebook.title}")
+            except Exception as e:
+                print_error(f"    Failed to delete notebook: {notebook.title} - {e}")
     
     return stats
 
@@ -200,6 +274,12 @@ async def main() -> None:
         default=None,
         help="Path to config.json file",
     )
+    parser.add_argument(
+        "--delete",
+        action="store_true",
+        default=False,
+        help="Delete notebooks from cloud after backing up",
+    )
     args = parser.parse_args()
     
     # Load configuration
@@ -216,13 +296,17 @@ async def main() -> None:
     
     print_summary("Starting NotebookLM backup...")
     print_summary(f"Output directory: {output_dir}")
+    if args.delete:
+        print_summary("WARNING: Notebooks will be DELETED from cloud after backup!")
     
     # Ensure output directory exists
     ensure_directory(output_dir)
     
     # Create client and backup
     async with await NotebookLMClient.from_storage() as client:
-        stats = await backup_notebooks(client, output_dir, artifact_types)
+        stats = await backup_notebooks(
+            client, output_dir, artifact_types, args.delete
+        )
     
     # Print final summary
     print_summary("Backup complete!")
@@ -232,7 +316,12 @@ async def main() -> None:
     print_summary(f"  Data Tables: {stats['data_tables']}")
     print_summary(f"  Audio Files: {stats['audio']}")
     print_summary(f"  Video Files: {stats['video']}")
+    print_summary(f"  Slide Decks: {stats['slides']}")
+    print_summary(f"  Fulltext Files: {stats['fulltext']}")
     print_summary(f"Total items backed up: {sum(stats.values())}")
+    
+    if args.delete:
+        print_summary("Notebooks have been deleted from cloud.")
 
 
 if __name__ == "__main__":

@@ -4,6 +4,12 @@
     "reports": true,
     "data_tables": true,
     "audio": true,
-    "video": true
+    "video": true,
+    "slides": true
+  },
+  "export_artifact_types": {
+    "reports": "docs",
+    "data_tables": "sheets",
+    "slides": "slides"
   }
 }

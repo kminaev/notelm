@@ -39,6 +39,12 @@ def get_default_config() -> dict[str, Any]:
             "data_tables": True,
             "audio": True,
             "video": True,
+            "slides": True,
+        },
+        "export_artifact_types": {
+            "reports": "docs",
+            "data_tables": "sheets",
+            "slides": "slides",
         },
     }
 
@@ -65,3 +71,15 @@ def get_artifact_types(config: dict[str, Any]) -> dict[str, bool]:
         Dictionary mapping artifact type names to boolean flags.
     """
     return config.get("backup_artifact_types", {})
+
+
+def get_export_types(config: dict[str, Any]) -> dict[str, str]:
+    """Get export target types for artifacts.
+    
+    Args:
+        config: Configuration dictionary.
+    
+    Returns:
+        Dictionary mapping artifact type to export target ("docs", "sheets", "slides").
+    """
+    return config.get("export_artifact_types", {})
