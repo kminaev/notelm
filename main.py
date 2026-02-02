@@ -230,13 +230,21 @@ async def backup_notebooks(
                     stats["fulltext"] += 1
                     # Use source title for filename, fallback to source id
                     if source.title:
-                        source_filename = sanitize_filename(source.title) + ".txt"
+                        source_filename = sanitize_filename(source.title) + ".md"
                     else:
-                        source_filename = f"{source.id}.txt"
+                        source_filename = f"{source.id}.md"
                     fulltext_path = fulltext_folder / source_filename
                     
+                    # Create markdown content with metadata
+                    markdown_content = f"# {source.title or 'Untitled Source'}\n\n"
+                    markdown_content += f"**Kind:** {source.kind}\n\n"
+                    if fulltext.url:
+                        markdown_content += f"**URL:** {fulltext.url}\n\n"
+                    markdown_content += f"---\n\n"
+                    markdown_content += fulltext.content
+                    
                     with open(fulltext_path, "w", encoding="utf-8") as f:
-                        f.write(fulltext.content)
+                        f.write(markdown_content)
                     print_progress(f"    Downloaded fulltext: {source.title or source.id}")
                 except Exception as e:
                     print_error(
