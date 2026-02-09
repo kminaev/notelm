@@ -5,7 +5,8 @@
     "data_tables": true,
     "audio": true,
     "video": true,
-    "slides": true
+    "slides": true,
+    "infographics": true
   },
   "export_artifact_types": {
     "reports": "docs",

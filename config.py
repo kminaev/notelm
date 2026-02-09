@@ -40,6 +40,7 @@ def get_default_config() -> dict[str, Any]:
             "audio": True,
             "video": True,
             "slides": True,
+            "infographics": True,
         },
         "export_artifact_types": {
             "reports": "docs",

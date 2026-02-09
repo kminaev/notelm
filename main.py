@@ -51,8 +51,7 @@ async def backup_notebooks(
         "reports": 0,
         "data_tables": 0,
         "audio": 0,
-        "video": 0,
-        "slides": 0,
+        "video": 0        "infographics": 0,
         "fulltext": 0,
     }
     
@@ -216,6 +215,27 @@ async def backup_notebooks(
             else:
                 print_progress(f"  Found 0 slide decks")
         
+        # Backup infographics
+        if artifact_types.get("infographics", True):
+            infographics = await client.artifacts.list_infographics(notebook.id)
+            if infographics:
+                infographics_folder = ensure_directory(notebook_folder / "infographics")
+                print_progress(f"  Found {len(infographics)} infographics")
+                
+                for infographic in infographics:
+                    stats["infographics"] += 1
+                    infographic_filename = sanitize_filename(infographic.title) + ".png"
+                    infographic_path = infographics_folder / infographic_filename
+                    try:
+                        await client.artifacts.download_infographic(
+                            notebook.id, str(infographic_path), infographic.id
+                        )
+                        print_progress(f"    Downloaded infographic: {infographic.title}")
+                    except Exception as e:
+                        print_error(f"    Failed to download infographic: {infographic.title} - {e}")
+            else:
+                print_progress(f"  Found 0 infographics")
+        
         # Backup fulltext for each source
         sources = await client.sources.list(notebook.id)
         if sources:
@@ -325,6 +345,7 @@ async def main() -> None:
     print_summary(f"  Audio Files: {stats['audio']}")
     print_summary(f"  Video Files: {stats['video']}")
     print_summary(f"  Slide Decks: {stats['slides']}")
+    print_summary(f"  Infographics: {stats['infographics']}")
     print_summary(f"  Fulltext Files: {stats['fulltext']}")
     print_summary(f"Total items backed up: {sum(stats.values())}")
     
