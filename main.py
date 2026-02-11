@@ -8,12 +8,14 @@ and artifacts to local Markdown files and other formats.
 Usage:
     python main.py                    # Use config.json output directory
     python main.py ./custom_backup    # Override output directory
+    python main.py --notebook "https://notebooklm.google.com/notebook/abc123"  # Backup specific notebook
     python main.py --delete           # Backup and delete notebooks from cloud
 """
 
 import argparse
 import asyncio
 import json
+import re
 from pathlib import Path
 
 from notebooklm import NotebookLMClient
@@ -21,6 +23,7 @@ from notebooklm import NotebookLMClient
 import config
 from utils import (
     ensure_directory,
+    extract_notebook_id,
     print_error,
     print_progress,
     print_summary,
@@ -33,14 +36,16 @@ async def backup_notebooks(
     output_dir: Path,
     artifact_types: dict[str, bool],
     delete_from_cloud: bool = False,
+    notebook_id: str | None = None,
 ) -> dict[str, int]:
-    """Backup all notebooks and their contents.
+    """Backup notebooks and their contents.
     
     Args:
         client: The NotebookLM client.
         output_dir: The base output directory.
         artifact_types: Dictionary of which artifact types to backup.
         delete_from_cloud: If True, delete notebooks from cloud after backup.
+        notebook_id: If provided, only backup this specific notebook.
     
     Returns:
         Dictionary with backup statistics.
@@ -51,14 +56,27 @@ async def backup_notebooks(
         "reports": 0,
         "data_tables": 0,
         "audio": 0,
-        "video": 0        "infographics": 0,
+        "video": 0,
+        "infographics": 0,
         "fulltext": 0,
     }
     
-    # Fetch all notebooks
+    # Fetch notebooks (either specific or all)
     print_progress("Fetching notebooks...")
-    notebooks = await client.notebooks.list()
-    print_summary(f"Found {len(notebooks)} notebooks")
+    
+    if notebook_id:
+        # Fetch specific notebook
+        try:
+            notebook = await client.notebooks.get(notebook_id)
+            notebooks = [notebook] if notebook else []
+            print_summary("Found 1 notebook (specified)")
+        except Exception as e:
+            print_error(f"Failed to fetch notebook {notebook_id}: {e}")
+            notebooks = []
+    else:
+        # Fetch all notebooks
+        notebooks = await client.notebooks.list()
+        print_summary(f"Found {len(notebooks)} notebooks")
     
     for notebook in notebooks:
         stats["notebooks"] += 1
@@ -308,7 +326,21 @@ async def main() -> None:
         default=False,
         help="Delete notebooks from cloud after backing up",
     )
+    parser.add_argument(
+        "--notebook",
+        type=str,
+        default=None,
+        help="Notebook URL or ID to backup (if not specified, all notebooks are backed up)",
+    )
     args = parser.parse_args()
+    
+    # Extract notebook ID from URL if provided
+    notebook_id = None
+    if args.notebook:
+        notebook_id = extract_notebook_id(args.notebook)
+        if not notebook_id:
+            print_error(f"Invalid notebook URL or ID: {args.notebook}")
+            return
     
     # Load configuration
     cfg = config.load_config(args.config)
@@ -323,6 +355,8 @@ async def main() -> None:
     artifact_types = config.get_artifact_types(cfg)
     
     print_summary("Starting NotebookLM backup...")
+    if notebook_id:
+        print_summary(f"Target notebook ID: {notebook_id}")
     print_summary(f"Output directory: {output_dir}")
     if args.delete:
         print_summary("WARNING: Notebooks will be DELETED from cloud after backup!")
@@ -333,7 +367,7 @@ async def main() -> None:
     # Create client and backup
     async with await NotebookLMClient.from_storage() as client:
         stats = await backup_notebooks(
-            client, output_dir, artifact_types, args.delete
+            client, output_dir, artifact_types, args.delete, notebook_id
         )
     
     # Print final summary

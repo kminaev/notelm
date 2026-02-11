@@ -38,6 +38,29 @@ def sanitize_filename(title: str) -> str:
     return sanitized
 
 
+def extract_notebook_id(url: str) -> str | None:
+    """Extract notebook ID from a NotebookLM URL.
+    
+    Args:
+        url: The NotebookLM URL (e.g., https://notebooklm.google.com/notebook/abc123)
+    
+    Returns:
+        The notebook ID if found, None otherwise.
+    """
+    if not url:
+        return None
+    
+    # Match pattern: https://notebooklm.google.com/notebook/{notebook_id}
+    pattern = r"notebooklm\.google\.com/notebook/([a-zA-Z0-9_-]+)"
+    match = re.search(pattern, url)
+    
+    if match:
+        return match.group(1)
+    
+    # If the URL doesn't match, assume it's already a notebook ID
+    return url if url else None
+
+
 def ensure_directory(path: Path) -> Path:
     """Create directory if it doesn't exist.
     
