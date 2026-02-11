@@ -365,11 +365,14 @@ async def main() -> None:
     ensure_directory(output_dir)
     
     # Create client and backup
-    async with await NotebookLMClient.from_storage() as client:
+    client = await NotebookLMClient.from_storage()
+    async with client:
         stats = await backup_notebooks(
             client, output_dir, artifact_types, args.delete, notebook_id
         )
     
+    #print(stats)
+
     # Print final summary
     print_summary("Backup complete!")
     print_summary(f"  Notebooks: {stats['notebooks']}")
@@ -378,7 +381,7 @@ async def main() -> None:
     print_summary(f"  Data Tables: {stats['data_tables']}")
     print_summary(f"  Audio Files: {stats['audio']}")
     print_summary(f"  Video Files: {stats['video']}")
-    print_summary(f"  Slide Decks: {stats['slides']}")
+    #print_summary(f"  Slide Decks: {stats['slides']}")
     print_summary(f"  Infographics: {stats['infographics']}")
     print_summary(f"  Fulltext Files: {stats['fulltext']}")
     print_summary(f"Total items backed up: {sum(stats.values())}")
@@ -387,5 +390,27 @@ async def main() -> None:
         print_summary("Notebooks have been deleted from cloud.")
 
 
+async def run_with_cleanup() -> None:
+    """Run main with proper cleanup for Python 3.12."""
+    try:
+        await main()
+    except asyncio.CancelledError:
+        print_error("Operation was cancelled")
+    except Exception as e:
+        print_error(f"An error occurred: {e}")
+        raise
+
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    # Python 3.12 compatibility: use new event loop policy if available
+    try:
+        asyncio.run(run_with_cleanup())
+    except KeyboardInterrupt:
+        print_error("Backup cancelled by user")
+    except RuntimeError as e:
+        # Handle common asyncio runtime errors in Python 3.12
+        if "Event loop is closed" in str(e) or "cannot close running loop" in str(e):
+            print_error(f"Asyncio error: {e}")
+            print_error("Try running with: python -m asyncio main.py")
+        else:
+            raise
