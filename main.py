@@ -365,8 +365,7 @@ async def main() -> None:
     ensure_directory(output_dir)
     
     # Create client and backup
-    client = await NotebookLMClient.from_storage()
-    async with client:
+    async with NotebookLMClient.from_storage() as client:
         stats = await backup_notebooks(
             client, output_dir, artifact_types, args.delete, notebook_id
         )
